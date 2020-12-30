@@ -1,0 +1,30 @@
+{
+  "name": "furry-system",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andormade/furry-system.git"
+  },
+  "author": "Andor Polgar",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/andormade/furry-system/issues"
+  },
+  "homepage": "https://github.com/andormade/furry-system#readme",
+  "devDependencies": {
+    "@squoosh/cli": "^0.6.0",
+    "prettier": "^2.2.1"
+  },
+  "dependencies": {
+    "date-fns": "^2.16.1",
+    "dotenv": "^8.2.0",
+    "moment": "^2.29.1",
+    "node-fetch": "^2.6.1",
+    "xml2js": "^0.4.23"
+  }
+}
