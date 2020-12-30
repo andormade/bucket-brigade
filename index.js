@@ -1,102 +1,28 @@
 require('dotenv').config();
-const { parseStringPromise } = require('xml2js');
 const fetch = require('node-fetch');
 const fs = require('fs').promises;
-const { createReadStream } = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
-const moment = require('moment');
-const crypto = require('crypto');
-
-function hmacsha256(key, data) {
-	return crypto.createHmac('sha256', key).update(data).digest();
-}
-
-function hmacsha256hex(key, data) {
-	return crypto.createHmac('sha256', key).update(data).digest('hex');
-}
-
-function sha256hex(data) {
-	return crypto.createHash('sha256').update(data).digest('hex');
-}
-
-async function createContentHash(stream) {
-	return new Promise(resolve => {
-		const shasum = crypto.createHash('sha256');
-		stream.on('data', function (data) {
-			shasum.update(data);
-		});
-		stream.on('end', function () {
-			resolve(shasum.digest());
-		});
-	});
-}
+const AWS = require('aws-sdk');
 
 const ORIGINALS_EXT = '.jpg';
-const { ACCESS_KEY, SERVER_REGION, SECRET_KEY, ORIGINALS_BASEPATH, CDN_BASEPATH, CDN_HOST } = process.env;
 
-function getAuthToken(props) {
-	const { method, headers, canonicalURI = '/', canonicalQueryString = '', hashedPayload = '' } = props;
-
-	const date = moment().format('YYYYMMDD');
-	const signedHeaders = Object.keys(headers).join(';');
-	const canonicalHeaders = Object.keys(headers)
-		.map(header => header + '=' + headers[header])
-		.join('\n');
-
-	const canonicalRequest =
-		method +
-		'\n' +
-		canonicalURI +
-		'\n' +
-		canonicalQueryString +
-		'\n' +
-		canonicalHeaders +
-		'\n' +
-		signedHeaders +
-		'\n' +
-		hashedPayload;
-
-	const stringToSign =
-		'AWS4-HMAC-SHA256' +
-		'\n' +
-		moment().format('YYYYMMDDTHHmm') +
-		'00Z' +
-		'\n' +
-		date +
-		'/' +
-		SERVER_REGION +
-		'/s3/aws4_request' +
-		'\n' +
-		sha256hex(canonicalRequest);
-
-	const dateKey = hmacsha256('AWS4' + SECRET_KEY, date);
-	const dateRegionKey = hmacsha256(dateKey, SERVER_REGION);
-	const dateRegionServiceKey = hmacsha256(dateRegionKey, 's3');
-	const signingKey = hmacsha256(dateRegionServiceKey, 'aws4_request');
-	const signature = hmacsha256hex(signingKey, stringToSign);
-
-	return (
-		'AWS4-HMAC-SHA256' +
-		' ' +
-		`Credential=${ACCESS_KEY}/${date}/${SERVER_REGION}/s3/aws4_request,` +
-		' ' +
-		`SignedHeaders=${signedHeaders},` +
-		' ' +
-		'Signature=' +
-		signature
-	);
-}
-
-async function getOriginals(basePath, extension) {
-	const response = await fetch(basePath);
-	const xml = await response.text();
-	const json = await parseStringPromise(xml);
-
-	return json.ListBucketResult.Contents.map(obj => ({
-		key: obj.Key[0],
-		lastModified: obj.LastModified[0],
-	})).filter(({ key }) => key.endsWith(extension));
+async function getOriginals(s3, extension) {
+	return new Promise((resolve, reject) => {
+		s3.listObjects({ Bucket: 'candywarehouse' }, function (err, data) {
+			if (err) {
+				return reject(err);
+			}
+			resolve(
+				data['Contents']
+					.map(({ Key, LastModified }) => ({
+						key: Key,
+						lastModified: LastModified,
+					}))
+					.filter(({ key }) => key.endsWith(extension))
+			);
+		});
+	});
 }
 
 async function downloadOriginal(basePath, key) {
@@ -105,38 +31,26 @@ async function downloadOriginal(basePath, key) {
 	await fs.writeFile(`.cache/${path.basename(key)}`, buffer);
 }
 
-async function uploadOptimized(basePath, key) {
-	const stream = createReadStream('./optimized/' + path.basename(key));
-	//const hash = createContentHash(stream);
-	const { size } = await fs.stat('./optimized/' + path.basename(key));
+async function uploadOptimized(s3, key) {
+	const content = await fs.readFile('./optimized/' + path.basename(key));
 
-	const headers = {
-		'content-length': size,
-		'x-amz-acl': 'public-read',
-		'content-type': 'image/jpg',
-		host: CDN_HOST,
-		//'x-amz-content-sha256': hash,
-		'x-amz-date': moment().format('YYYYMMDDTHHmm') + '00Z',
-	};
-
-	const response = await fetch(basePath + key, {
-		method: 'PUT',
-		headers: {
-			...{
-				Authorization: getAuthToken({
-					method: 'PUT',
-					headers,
-					hashedPayload: '',
-				}),
+	return new Promise((resolve, reject) => {
+		s3.putObject(
+			{
+				Bucket: 'candystore',
+				Key: key,
+				Body: content,
+				ACL: 'public-read',
 			},
-			...headers,
-		},
-		body: stream,
+			(err, data) => {
+				if (err) {
+					console.log(err);
+					return reject(err);
+				}
+				resolve(data);
+			}
+		);
 	});
-
-	console.log('response:', response);
-
-	return response;
 }
 
 async function optimize() {
@@ -144,6 +58,7 @@ async function optimize() {
 		exec(`npx squoosh-cli --mozjpeg '{quality: 80}' --output-dir optimized .cache/*.jpg`, (error, stdout, stderr) => {
 			if (error) {
 				console.log(`${error.message}`);
+				return reject();
 			}
 			if (stderr) {
 				console.log(`${stderr}`);
@@ -155,7 +70,14 @@ async function optimize() {
 }
 
 (async function () {
-	const originals = await getOriginals(ORIGINALS_BASEPATH, ORIGINALS_EXT);
+	const spacesEndpoint = new AWS.Endpoint('ams3.digitaloceanspaces.com');
+	const s3 = new AWS.S3({
+		endpoint: spacesEndpoint,
+		accessKeyId: process.env.ACCESS_KEY,
+		secretAccessKey: process.env.SECRET_KEY,
+	});
+
+	const originals = await getOriginals(s3, ORIGINALS_EXT);
 
 	console.log('Downloading originals...');
 
@@ -173,7 +95,7 @@ async function optimize() {
 
 	await Promise.all(
 		originals.map(async original => {
-			return await uploadOptimized(CDN_BASEPATH, original.key);
+			return await uploadOptimized(s3, original.key);
 		})
 	);
 })();
