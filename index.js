@@ -28,11 +28,12 @@ async function getOriginals(s3, extension) {
 async function downloadOriginal(basePath, key) {
 	const response = await fetch(basePath + key);
 	const buffer = await response.buffer();
-	await fs.writeFile(`.cache/${path.basename(key)}`, buffer);
+	await fs.mkdir(`.cache/originals/${path.dirname(key)}`, { recursive: true });
+	await fs.writeFile(`.cache/originals/${key}`, buffer);
 }
 
 async function uploadOptimized(s3, key) {
-	const content = await fs.readFile('./optimized/' + path.basename(key));
+	const content = await fs.readFile('.cache/optimized/' + path.basename(key));
 
 	return new Promise((resolve, reject) => {
 		s3.putObject(
@@ -55,17 +56,20 @@ async function uploadOptimized(s3, key) {
 
 async function optimize() {
 	return new Promise((resolve, reject) => {
-		exec(`npx squoosh-cli --mozjpeg '{quality: 80}' --output-dir optimized .cache/*.jpg`, (error, stdout, stderr) => {
-			if (error) {
-				console.log(`${error.message}`);
-				return reject();
+		exec(
+			`npx squoosh-cli --mozjpeg '{quality: 80}' --output-dir .cache/optimized .cache/originals/**/*.jpg`,
+			(error, stdout, stderr) => {
+				if (error) {
+					console.log(`${error.message}`);
+					return reject();
+				}
+				if (stderr) {
+					console.log(`${stderr}`);
+				}
+				console.log(`${stdout}`);
+				resolve();
 			}
-			if (stderr) {
-				console.log(`${stderr}`);
-			}
-			console.log(`${stdout}`);
-			resolve();
-		});
+		);
 	});
 }
 
@@ -83,7 +87,7 @@ async function optimize() {
 
 	await Promise.all(
 		originals.map(async original => {
-			return await downloadOriginal(ORIGINALS_BASEPATH, original.key);
+			return await downloadOriginal('https://ams3.digitaloceanspaces.com/candywarehouse/', original.key);
 		})
 	);
 
