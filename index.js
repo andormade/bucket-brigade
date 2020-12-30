@@ -33,7 +33,7 @@ async function downloadOriginal(basePath, key) {
 }
 
 async function uploadOptimized(s3, key) {
-	const content = await fs.readFile('.cache/optimized/' + path.basename(key));
+	const content = await fs.readFile('.cache/optimized/' + key);
 
 	return new Promise((resolve, reject) => {
 		s3.putObject(
@@ -42,6 +42,7 @@ async function uploadOptimized(s3, key) {
 				Key: key,
 				Body: content,
 				ACL: 'public-read',
+				ContentType: 'image/jpg',
 			},
 			(err, data) => {
 				if (err) {
@@ -54,10 +55,12 @@ async function uploadOptimized(s3, key) {
 	});
 }
 
-async function optimize() {
+async function optimize(key) {
+	const config = `--mozjpeg '{quality: 80}'`;
+
 	return new Promise((resolve, reject) => {
 		exec(
-			`npx squoosh-cli --mozjpeg '{quality: 80}' --output-dir .cache/optimized .cache/originals/**/*.jpg`,
+			`npx squoosh-cli ${config} --output-dir .cache/optimized/${path.dirname(key)} .cache/originals/${key}`,
 			(error, stdout, stderr) => {
 				if (error) {
 					console.log(`${error.message}`);
@@ -93,7 +96,9 @@ async function optimize() {
 
 	console.log('Optimizing originals...');
 
-	await optimize();
+	for (let i = 0; i < originals.length; i++) {
+		await optimize(originals[i].key);
+	}
 
 	console.log('Uploading optimized images...');
 
