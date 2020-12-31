@@ -30,9 +30,10 @@ async function downloadOriginal(basePath, key) {
 	const buffer = await response.buffer();
 	await fs.mkdir(`.cache/originals/${path.dirname(key)}`, { recursive: true });
 	await fs.writeFile(`.cache/originals/${key}`, buffer);
+	console.log(key, 'done');
 }
 
-async function uploadOptimized(s3, key) {
+async function uploadOptimized(s3, key, ContentType = 'image/jpg') {
 	const content = await fs.readFile('.cache/optimized/' + key);
 
 	return new Promise((resolve, reject) => {
@@ -42,13 +43,14 @@ async function uploadOptimized(s3, key) {
 				Key: key,
 				Body: content,
 				ACL: 'public-read',
-				ContentType: 'image/jpg',
+				ContentType,
 			},
 			(err, data) => {
 				if (err) {
 					console.log(err);
 					return reject(err);
 				}
+				console.log(key, 'done');
 				resolve(data);
 			}
 		);
@@ -56,11 +58,10 @@ async function uploadOptimized(s3, key) {
 }
 
 async function optimize(key) {
-	const config = `--mozjpeg '{quality: 80}'`;
-
+	await fs.mkdir(`.cache/optimized/${path.dirname(key)}`, { recursive: true });
 	return new Promise((resolve, reject) => {
 		exec(
-			`npx squoosh-cli ${config} --output-dir .cache/optimized/${path.dirname(key)} .cache/originals/${key}`,
+			`./magick convert .cache/originals/${key} -resize 1500x1500 -quality 80 .cache/optimized/${key}`,
 			(error, stdout, stderr) => {
 				if (error) {
 					console.log(`${error.message}`);
@@ -69,8 +70,11 @@ async function optimize(key) {
 				if (stderr) {
 					console.log(`${stderr}`);
 				}
-				console.log(`${stdout}`);
+				if (stdout) {
+					console.log(`${stdout}`);
+				}
 				resolve();
+				console.log(key, 'done');
 			}
 		);
 	});
@@ -90,7 +94,7 @@ async function optimize(key) {
 
 	await Promise.all(
 		originals.map(async original => {
-			return await downloadOriginal('https://ams3.digitaloceanspaces.com/candywarehouse/', original.key);
+			await downloadOriginal('https://ams3.digitaloceanspaces.com/candywarehouse/', original.key);
 		})
 	);
 
@@ -104,7 +108,7 @@ async function optimize(key) {
 
 	await Promise.all(
 		originals.map(async original => {
-			return await uploadOptimized(s3, original.key);
+			await uploadOptimized(s3, original.key);
 		})
 	);
 })();
