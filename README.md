@@ -18,4 +18,8 @@ Believe it or not, but Github suggested this name when I was creating the reposi
 
 ## Dependencies
 
+* Ubuntu 20.04
+* nodejs 14.15.3
+* libharfbuzz0b
+* libfontconfig
 * imagemagick
