@@ -25,12 +25,20 @@ async function getOriginals(s3, extension) {
 	});
 }
 
-async function downloadOriginal(basePath, key) {
-	const response = await fetch(basePath + key);
-	const buffer = await response.buffer();
-	await fs.mkdir(`.cache/originals/${path.dirname(key)}`, { recursive: true });
-	await fs.writeFile(`.cache/originals/${key}`, buffer);
-	console.log(key, 'done');
+async function downloadOriginal(s3, key) {
+	return new Promise((resolve, reject) => {
+		s3.getObject({ Bucket: process.env.SOURCE_BUCKET, Key: key }, async (err, data) => {
+			if (err) {
+				console.log(err);
+				return reject(err);
+			}
+
+			await fs.mkdir(`.cache/originals/${path.dirname(key)}`, { recursive: true });
+			await fs.writeFile(`.cache/originals/${key}`, data.Body);
+			console.log(key, 'done');
+			resolve();
+		});
+	});
 }
 
 async function uploadOptimized(s3, key, ContentType = 'image/jpg') {
@@ -92,11 +100,9 @@ async function optimize(key) {
 
 	console.log('Downloading originals...');
 
-	await Promise.all(
-		originals.map(async original => {
-			await downloadOriginal(`https://${process.env.AWS_ENDPOINT}/${process.env.SOURCE_BUCKET}/`, original.key);
-		})
-	);
+	for (let i = 0; i < originals.length; i++) {
+		await downloadOriginal(s3, originals[i].key);
+	}
 
 	console.log('Optimizing originals...');
 
@@ -106,9 +112,7 @@ async function optimize(key) {
 
 	console.log('Uploading optimized images...');
 
-	await Promise.all(
-		originals.map(async original => {
-			await uploadOptimized(s3, original.key);
-		})
-	);
+	for (let i = 0; i < originals.length; i++) {
+		await uploadOptimized(s3, originals[i].key);
+	}
 })();
