@@ -9,7 +9,7 @@ const ORIGINALS_EXT = '.jpg';
 
 async function getOriginals(s3, extension) {
 	return new Promise((resolve, reject) => {
-		s3.listObjects({ Bucket: 'candywarehouse' }, function (err, data) {
+		s3.listObjects({ Bucket: process.env.SOURCE_BUCKET }, function (err, data) {
 			if (err) {
 				return reject(err);
 			}
@@ -39,7 +39,7 @@ async function uploadOptimized(s3, key, ContentType = 'image/jpg') {
 	return new Promise((resolve, reject) => {
 		s3.putObject(
 			{
-				Bucket: 'candystore',
+				Bucket: process.env.DESTINATION_BUCKET,
 				Key: key,
 				Body: content,
 				ACL: 'public-read',
@@ -81,7 +81,7 @@ async function optimize(key) {
 }
 
 (async function () {
-	const spacesEndpoint = new AWS.Endpoint('ams3.digitaloceanspaces.com');
+	const spacesEndpoint = new AWS.Endpoint(process.env.AWS_ENDPOINT);
 	const s3 = new AWS.S3({
 		endpoint: spacesEndpoint,
 		accessKeyId: process.env.ACCESS_KEY,
@@ -94,7 +94,7 @@ async function optimize(key) {
 
 	await Promise.all(
 		originals.map(async original => {
-			await downloadOriginal('https://ams3.digitaloceanspaces.com/candywarehouse/', original.key);
+			await downloadOriginal(`https://${process.env.AWS_ENDPOINT}/${process.env.SOURCE_BUCKET}/`, original.key);
 		})
 	);
 

@@ -6,4 +6,16 @@ It takes image files from an Amazon S3 (or compatible) bucket, makes them smalle
 
 ## Why the name furry system?
 
-Github recommended this name when I was creating the repository and I accepted it.
+Believe it or not, but Github suggested this name when I was creating the repository, and I accepted it.
+
+## Required environment variables
+
+* ACCESS_KEY
+* SECRET_KEY
+* AWS_ENDPOINT
+* SOURCE_BUCKET
+* DESTINATION_BUCKET
+
+## Dependencies
+
+* imagemagick
