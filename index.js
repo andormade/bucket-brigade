@@ -3,6 +3,17 @@ const fs = require('fs').promises;
 const path = require('path');
 const { exec } = require('child_process');
 const AWS = require('aws-sdk');
+const conf = require('rc')('furry-system', {});
+const rmrf = require('rmrf');
+
+function isToday(date) {
+	const today = new Date();
+	return (
+		date.getDate() == today.getDate() &&
+		date.getMonth() == today.getMonth() &&
+		date.getFullYear() == today.getFullYear()
+	);
+}
 
 async function listObjectsPromise(s3, marker) {
 	return new Promise((resolve, reject) => {
@@ -11,28 +22,32 @@ async function listObjectsPromise(s3, marker) {
 				return reject(err);
 			}
 
-			const originals = data['Contents']
-				.map(({ Key, LastModified }) => ({
-					key: Key,
-					lastModified: LastModified,
-				}))
-				.filter(({ key }) => key.endsWith('.jpg'));
+			const objects = data['Contents'].map(({ Key, LastModified }) => ({
+				key: Key,
+				lastModified: LastModified,
+			}));
 
-			resolve(originals);
+			resolve(objects);
 		});
 	});
 }
 
 async function getOriginals(s3, callback) {
-	let last;
+	let lastKey;
 	while (true) {
-		const originals = await listObjectsPromise(s3, last);
+		await rmrf('.cache');
 
-		if (originals.length === 0) {
+		const objects = await listObjectsPromise(s3, lastKey);
+
+		if (objects.length === 0) {
 			break;
 		}
 
-		last = originals[originals.length - 1].key;
+		lastKey = objects[objects.length - 1].key;
+
+		const originals = objects
+			.filter(({ lastModified }) => isToday(new Date(lastModified)))
+			.filter(({ key }) => key.endsWith('.jpg'));
 
 		for (let i = 0; i < originals.length; i++) {
 			await callback(originals[i]);
@@ -109,13 +124,14 @@ async function optimize(key) {
 	});
 
 	await getOriginals(s3, async ({ key }) => {
-		process.stdout.write('Downloading: ' + key);
+		process.stdout.write('\x1b[2m' + key + '\x1b[0m');
+		process.stdout.write(' downloading...');
 		await downloadOriginal(s3, key);
-		process.stdout.write(' \x1b[32mdone\n\x1b[0m');
-		process.stdout.write('Optimizing: ' + key);
+		process.stdout.write(' \x1b[32mdone\x1b[0m');
+		process.stdout.write(' optimizing...');
 		await optimize(key);
-		process.stdout.write(' \x1b[32mdone\n\x1b[0m');
-		process.stdout.write('Uploading: ' + key);
+		process.stdout.write(' \x1b[32mdone\x1b[0m');
+		process.stdout.write(' uploading...');
 		await uploadOptimized(s3, key);
 		process.stdout.write(' \x1b[32mdone\n\x1b[0m');
 	});

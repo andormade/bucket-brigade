@@ -23,6 +23,8 @@
   "dependencies": {
     "aws-sdk": "^2.819.0",
     "dotenv": "^8.2.0",
-    "node-fetch": "^2.6.1"
+    "node-fetch": "^2.6.1",
+    "rc": "^1.2.8",
+    "rmrf": "^2.0.3"
   }
 }
