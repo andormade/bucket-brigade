@@ -97,7 +97,7 @@ async function optimize(key) {
 	await fs.mkdir(`.cache/optimized/${path.dirname(key)}`, { recursive: true });
 	return new Promise((resolve, reject) => {
 		exec(
-			`./magick convert '.cache/originals/${key}' -resize 1500x1500 -quality 80 '.cache/optimized/${key}'`,
+			`./magick convert '.cache/originals/${key}' -resize 1500x1500 '.cache/optimized/${key}'`,
 			(error, stdout, stderr) => {
 				if (error) {
 					console.log(`${error.message}`);
