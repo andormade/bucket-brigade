@@ -1,11 +1,13 @@
-require('dotenv').config();
-const fs = require('fs').promises;
-const path = require('path');
-const { exec } = require('child_process');
-const AWS = require('aws-sdk');
-const rmrf = require('rmrf');
+import { config } from 'dotenv';
+import { promises as fs } from 'fs';
+import path from 'path';
+import { exec } from 'child_process';
+import AWS from 'aws-sdk';
+import rmrf from 'rmrf';
 
-function isToday(date) {
+config();
+
+function isToday(date: Date): boolean {
 	const today = new Date();
 	return (
 		date.getDate() == today.getDate() &&
@@ -14,29 +16,38 @@ function isToday(date) {
 	);
 }
 
-async function listObjectsPromise(s3, marker) {
+async function listObjectsPromise(
+	s3: AWS.S3,
+	marker?: string | undefined
+): Promise<Array<{ key: string; lastModified: Date }>> {
 	return new Promise((resolve, reject) => {
-		s3.listObjects({ Bucket: process.env.SOURCE_BUCKET, MaxKeys: 5, Marker: marker }, async (err, data) => {
-			if (err) {
-				return reject(err);
+		s3.listObjects(
+			{ Bucket: process.env.SOURCE_BUCKET || '', MaxKeys: 5, Marker: marker },
+			async (err, { Contents = [] }) => {
+				if (err) {
+					return reject(err);
+				}
+
+				const objects = Contents.map(({ Key = '', LastModified = new Date() }) => ({
+					key: Key,
+					lastModified: LastModified,
+				}));
+
+				resolve(objects);
 			}
-
-			const objects = data['Contents'].map(({ Key, LastModified }) => ({
-				key: Key,
-				lastModified: LastModified,
-			}));
-
-			resolve(objects);
-		});
+		);
 	});
 }
 
-async function getOriginals(s3, callback) {
-	let lastKey;
+async function getOriginals(
+	s3: AWS.S3,
+	callback: (objects: { key: string; lastModified: Date }) => Promise<void>
+): Promise<void> {
+	let lastKey: string | undefined = undefined;
 	while (true) {
 		await rmrf('.cache');
 
-		const objects = await listObjectsPromise(s3, lastKey);
+		const objects: Array<{ lastModified: Date; key: string }> = await listObjectsPromise(s3, lastKey);
 
 		if (objects.length === 0) {
 			break;
@@ -54,28 +65,28 @@ async function getOriginals(s3, callback) {
 	}
 }
 
-async function downloadOriginal(s3, key) {
+async function downloadOriginal(s3: AWS.S3, key: string): Promise<void> {
 	return new Promise((resolve, reject) => {
-		s3.getObject({ Bucket: process.env.SOURCE_BUCKET, Key: key }, async (err, data) => {
+		s3.getObject({ Bucket: process.env.SOURCE_BUCKET || '', Key: key }, async (err, data) => {
 			if (err) {
 				console.log(err);
 				return reject(err);
 			}
 
 			await fs.mkdir(`.cache/originals/${path.dirname(key)}`, { recursive: true });
-			await fs.writeFile(`.cache/originals/${key}`, data.Body);
+			await fs.writeFile(`.cache/originals/${key}`, data.Body as string);
 			resolve();
 		});
 	});
 }
 
-async function uploadOptimized(s3, key, ContentType = 'image/jpg') {
+async function uploadOptimized(s3: AWS.S3, key: string, ContentType = 'image/jpg'): Promise<AWS.S3.PutObjectOutput> {
 	const content = await fs.readFile('.cache/optimized/' + key);
 
 	return new Promise((resolve, reject) => {
 		s3.putObject(
 			{
-				Bucket: process.env.DESTINATION_BUCKET,
+				Bucket: process.env.DESTINATION_BUCKET || '',
 				Key: key,
 				Body: content,
 				ACL: 'public-read',
@@ -92,7 +103,7 @@ async function uploadOptimized(s3, key, ContentType = 'image/jpg') {
 	});
 }
 
-async function optimize(key) {
+async function optimize(key: string): Promise<void> {
 	await fs.mkdir(`.cache/optimized/${path.dirname(key)}`, { recursive: true });
 	return new Promise((resolve, reject) => {
 		exec(
@@ -115,11 +126,11 @@ async function optimize(key) {
 }
 
 (async function () {
-	const spacesEndpoint = new AWS.Endpoint(process.env.AWS_ENDPOINT);
+	const spacesEndpoint = new AWS.Endpoint(process.env.AWS_ENDPOINT || '');
 	const s3 = new AWS.S3({
 		endpoint: spacesEndpoint,
-		accessKeyId: process.env.ACCESS_KEY,
-		secretAccessKey: process.env.SECRET_KEY,
+		accessKeyId: process.env.ACCESS_KEY || '',
+		secretAccessKey: process.env.SECRET_KEY || '',
 	});
 
 	await getOriginals(s3, async ({ key }) => {
