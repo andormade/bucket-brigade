@@ -1,30 +1,28 @@
 {
-  "name": "furry-system",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/andormade/furry-system.git"
-  },
-  "author": "Andor Polgar",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/andormade/furry-system/issues"
-  },
-  "homepage": "https://github.com/andormade/furry-system#readme",
-  "devDependencies": {
-    "@squoosh/cli": "^0.6.0",
-    "prettier": "^2.2.1"
-  },
-  "dependencies": {
-    "aws-sdk": "^2.819.0",
-    "dotenv": "^8.2.0",
-    "node-fetch": "^2.6.1",
-    "rc": "^1.2.8",
-    "rmrf": "^2.0.3"
-  }
+	"name": "bucket-brigade",
+	"version": "1.0.0",
+	"description": "",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"start": "node index.js"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/andormade/furry-system.git"
+	},
+	"author": "Andor Polgar",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/andormade/furry-system/issues"
+	},
+	"homepage": "https://github.com/andormade/furry-system#readme",
+	"devDependencies": {
+		"prettier": "2.2.1"
+	},
+	"dependencies": {
+		"aws-sdk": "2.819.0",
+		"dotenv": "8.2.0",
+		"rmrf": "2.0.3"
+	}
 }

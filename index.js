@@ -3,7 +3,6 @@ const fs = require('fs').promises;
 const path = require('path');
 const { exec } = require('child_process');
 const AWS = require('aws-sdk');
-const conf = require('rc')('furry-system', {});
 const rmrf = require('rmrf');
 
 function isToday(date) {
