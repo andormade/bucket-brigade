@@ -9,14 +9,14 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/andormade/furry-system.git"
+		"url": "git+https://github.com/andormade/bucket-brigade.git"
 	},
 	"author": "Andor Polgar",
 	"license": "MIT",
 	"bugs": {
-		"url": "https://github.com/andormade/furry-system/issues"
+		"url": "https://github.com/andormade/bucket-brigade/issues"
 	},
-	"homepage": "https://github.com/andormade/furry-system#readme",
+	"homepage": "https://github.com/andormade/bucket-brigade#readme",
 	"devDependencies": {
 		"prettier": "2.2.1"
 	},
