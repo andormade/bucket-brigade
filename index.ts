@@ -1,5 +1,5 @@
 import { config } from 'dotenv';
-import { promises as fs } from 'fs';
+import oldFs, { promises as fs } from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
 import AWS from 'aws-sdk';
@@ -41,6 +41,7 @@ async function listObjectsPromise(
 
 async function getOriginals(
 	s3: AWS.S3,
+	lastRan: Date,
 	callback: (objects: { key: string; lastModified: Date }) => Promise<void>
 ): Promise<void> {
 	let lastKey: string | undefined = undefined;
@@ -56,7 +57,9 @@ async function getOriginals(
 		lastKey = objects[objects.length - 1].key;
 
 		const originals = objects
-			.filter(({ lastModified }) => isToday(new Date(lastModified)))
+			.filter(({ lastModified }) => {
+				return lastModified.getTime() >= lastRan.getTime();
+			})
 			.filter(({ key }) => key.endsWith('.jpg'));
 
 		for (let i = 0; i < originals.length; i++) {
@@ -125,7 +128,25 @@ async function optimize(key: string): Promise<void> {
 	});
 }
 
+async function getLastRunTime(): Promise<Date> {
+	if (!oldFs.existsSync('./.last-run')) {
+		return new Date(0);
+	}
+	const file = await fs.readFile('./.last-run');
+	const lastRun = parseInt(file.toString(), 10);
+	return new Date(lastRun);
+}
+
+async function writeLastRunTime(): Promise<void> {
+	await fs.writeFile('./.last-run', new Date().getTime().toString());
+}
+
 (async function () {
+	const lastRan = await getLastRunTime();
+	await writeLastRunTime();
+
+	console.log('Collecting files...');
+
 	const spacesEndpoint = new AWS.Endpoint(process.env.AWS_ENDPOINT || '');
 	const s3 = new AWS.S3({
 		endpoint: spacesEndpoint,
@@ -133,7 +154,7 @@ async function optimize(key: string): Promise<void> {
 		secretAccessKey: process.env.SECRET_KEY || '',
 	});
 
-	await getOriginals(s3, async ({ key }) => {
+	await getOriginals(s3, lastRan, async ({ key }) => {
 		process.stdout.write('\x1b[2m' + key + '\x1b[0m');
 		process.stdout.write(' downloading...');
 		await downloadOriginal(s3, key);
