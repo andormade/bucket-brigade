@@ -1,0 +1,8 @@
+node_modules
+src
+.gitignore
+magick
+tsconfig.json
+.last-run
+.bucket-brigaderc
+.prettierrc
