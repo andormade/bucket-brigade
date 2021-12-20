@@ -105,7 +105,7 @@ async function uploadTransformed(s3: AWS.S3, key: string, ContentType = 'image/j
 }
 
 async function transform(key: string): Promise<void> {
-	await fs.mkdir(`.cache/transformed/${path.dirname(key)}`, { recursive: true });
+	await fs.mkdir(`${config.cacheDir}/transformed/${path.dirname(key)}`, { recursive: true });
 	return new Promise((resolve, reject) => {
 		exec(
 			config.transformCommandTemplate
