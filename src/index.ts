@@ -159,7 +159,7 @@ async function writeLastRunTime(): Promise<void> {
 		process.stdout.write(' downloading...');
 		await downloadOriginal(s3, key);
 		process.stdout.write(' \x1b[32mdone\x1b[0m');
-		process.stdout.write(' optimizing...');
+		process.stdout.write(' transforming...');
 		await transform(key);
 		process.stdout.write(' \x1b[32mdone\x1b[0m');
 		process.stdout.write(' uploading...');

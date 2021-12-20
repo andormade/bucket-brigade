@@ -1,13 +1,14 @@
 {
 	"name": "bucket-brigade",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "",
 	"main": "bin/index.js",
 	"bin": {
 		"bucket-brigade": "bin/index.js"
 	},
 	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1",
+		"prepublish": "npm run build",
+		"postinstall": "npm run build",
 		"build": "tsc"
 	},
 	"repository": {
