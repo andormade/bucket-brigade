@@ -2,7 +2,7 @@
 
 ## What does this do?
 
-It takes files from an Amazon S3 (or compatible) bucket, and then puts them into an other S3 compatible bucket.
+It takes files from an Amazon S3 (or compatible) bucket, transforms them with a specified command, and then puts them into an other S3 compatible bucket.
 
 ## Dependencies
 
