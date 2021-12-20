@@ -14,6 +14,7 @@ const config = rc('bucket-brigade', {
 	sourceBucket: '',
 	destinationBucket: '',
 	cacheDir: '.bucket-brigade-cache',
+	transformCommandTemplate: 'cp {source} {destination}',
 });
 
 async function listObjectsPromise(
@@ -80,8 +81,8 @@ async function downloadOriginal(s3: AWS.S3, key: string): Promise<void> {
 	});
 }
 
-async function uploadOptimized(s3: AWS.S3, key: string, ContentType = 'image/jpg'): Promise<AWS.S3.PutObjectOutput> {
-	const content = await fs.readFile(`${config.cacheDir}/optimized/` + key);
+async function uploadTransformed(s3: AWS.S3, key: string, ContentType = 'image/jpg'): Promise<AWS.S3.PutObjectOutput> {
+	const content = await fs.readFile(`${config.cacheDir}/transformed/` + key);
 
 	return new Promise((resolve, reject) => {
 		s3.putObject(
@@ -103,11 +104,13 @@ async function uploadOptimized(s3: AWS.S3, key: string, ContentType = 'image/jpg
 	});
 }
 
-async function optimize(key: string): Promise<void> {
-	await fs.mkdir(`.cache/optimized/${path.dirname(key)}`, { recursive: true });
+async function transform(key: string): Promise<void> {
+	await fs.mkdir(`.cache/transformed/${path.dirname(key)}`, { recursive: true });
 	return new Promise((resolve, reject) => {
 		exec(
-			`./magick convert '${config.cacheDir}/originals/${key}' -resize 1500x1500 '${config.cacheDir}/optimized/${key}'`,
+			config.transformCommandTemplate
+				.replace('{source}', `${config.cacheDir}/originals/${key}`)
+				.replace('{dest}', `${config.cacheDir}/transformed/${key}`),
 			(error, stdout, stderr) => {
 				if (error) {
 					console.log(`${error.message}`);
@@ -157,10 +160,10 @@ async function writeLastRunTime(): Promise<void> {
 		await downloadOriginal(s3, key);
 		process.stdout.write(' \x1b[32mdone\x1b[0m');
 		process.stdout.write(' optimizing...');
-		await optimize(key);
+		await transform(key);
 		process.stdout.write(' \x1b[32mdone\x1b[0m');
 		process.stdout.write(' uploading...');
-		await uploadOptimized(s3, key);
+		await uploadTransformed(s3, key);
 		process.stdout.write(' \x1b[32mdone\n\x1b[0m');
 	});
 })();
