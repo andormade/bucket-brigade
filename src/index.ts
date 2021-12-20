@@ -1,41 +1,38 @@
-import { config } from 'dotenv';
+#!/usr/bin/env node
+
 import oldFs, { promises as fs } from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
 import AWS from 'aws-sdk';
 import rmrf from 'rmrf';
+import rc from 'rc';
 
-config();
-
-function isToday(date: Date): boolean {
-	const today = new Date();
-	return (
-		date.getDate() == today.getDate() &&
-		date.getMonth() == today.getMonth() &&
-		date.getFullYear() == today.getFullYear()
-	);
-}
+const config = rc('bucket-brigade', {
+	awsEndpoint: '',
+	accessKey: '',
+	secretKey: '',
+	sourceBucket: '',
+	destinationBucket: '',
+	cacheDir: '.bucket-brigade-cache',
+});
 
 async function listObjectsPromise(
 	s3: AWS.S3,
 	marker?: string | undefined
 ): Promise<Array<{ key: string; lastModified: Date }>> {
 	return new Promise((resolve, reject) => {
-		s3.listObjects(
-			{ Bucket: process.env.SOURCE_BUCKET || '', MaxKeys: 5, Marker: marker },
-			async (err, { Contents = [] }) => {
-				if (err) {
-					return reject(err);
-				}
-
-				const objects = Contents.map(({ Key = '', LastModified = new Date() }) => ({
-					key: Key,
-					lastModified: LastModified,
-				}));
-
-				resolve(objects);
+		s3.listObjects({ Bucket: config.sourceBucket, MaxKeys: 5, Marker: marker }, async (err, { Contents = [] }) => {
+			if (err) {
+				return reject(err);
 			}
-		);
+
+			const objects = Contents.map(({ Key = '', LastModified = new Date() }) => ({
+				key: Key,
+				lastModified: LastModified,
+			}));
+
+			resolve(objects);
+		});
 	});
 }
 
@@ -46,7 +43,7 @@ async function getOriginals(
 ): Promise<void> {
 	let lastKey: string | undefined = undefined;
 	while (true) {
-		await rmrf('.cache');
+		await rmrf(config.cacheDir);
 
 		const objects: Array<{ lastModified: Date; key: string }> = await listObjectsPromise(s3, lastKey);
 
@@ -70,26 +67,26 @@ async function getOriginals(
 
 async function downloadOriginal(s3: AWS.S3, key: string): Promise<void> {
 	return new Promise((resolve, reject) => {
-		s3.getObject({ Bucket: process.env.SOURCE_BUCKET || '', Key: key }, async (err, data) => {
+		s3.getObject({ Bucket: config.sourceBucket, Key: key }, async (err, data) => {
 			if (err) {
 				console.log(err);
 				return reject(err);
 			}
 
-			await fs.mkdir(`.cache/originals/${path.dirname(key)}`, { recursive: true });
-			await fs.writeFile(`.cache/originals/${key}`, data.Body as string);
+			await fs.mkdir(`${config.cacheDir}/originals/${path.dirname(key)}`, { recursive: true });
+			await fs.writeFile(`${config.cacheDir}/originals/${key}`, data.Body as string);
 			resolve();
 		});
 	});
 }
 
 async function uploadOptimized(s3: AWS.S3, key: string, ContentType = 'image/jpg'): Promise<AWS.S3.PutObjectOutput> {
-	const content = await fs.readFile('.cache/optimized/' + key);
+	const content = await fs.readFile(`${config.cacheDir}/optimized/` + key);
 
 	return new Promise((resolve, reject) => {
 		s3.putObject(
 			{
-				Bucket: process.env.DESTINATION_BUCKET || '',
+				Bucket: config.destinationBucket,
 				Key: key,
 				Body: content,
 				ACL: 'public-read',
@@ -110,7 +107,7 @@ async function optimize(key: string): Promise<void> {
 	await fs.mkdir(`.cache/optimized/${path.dirname(key)}`, { recursive: true });
 	return new Promise((resolve, reject) => {
 		exec(
-			`./magick convert '.cache/originals/${key}' -resize 1500x1500 '.cache/optimized/${key}'`,
+			`./magick convert '${config.cacheDir}/originals/${key}' -resize 1500x1500 '${config.cacheDir}/optimized/${key}'`,
 			(error, stdout, stderr) => {
 				if (error) {
 					console.log(`${error.message}`);
@@ -147,11 +144,11 @@ async function writeLastRunTime(): Promise<void> {
 
 	console.log('Collecting files...');
 
-	const spacesEndpoint = new AWS.Endpoint(process.env.AWS_ENDPOINT || '');
+	const spacesEndpoint = new AWS.Endpoint(config.awsEndpoint);
 	const s3 = new AWS.S3({
 		endpoint: spacesEndpoint,
-		accessKeyId: process.env.ACCESS_KEY || '',
-		secretAccessKey: process.env.SECRET_KEY || '',
+		accessKeyId: config.accessKey,
+		secretAccessKey: config.secretKey,
 	});
 
 	await getOriginals(s3, lastRan, async ({ key }) => {

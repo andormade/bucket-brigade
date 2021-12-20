@@ -1,5 +1,7 @@
 node_modules
 *.env
-.cache
+.bucket-brigade-cache
+.bucket-brigaderc
 magick
 .last-run
+bin
