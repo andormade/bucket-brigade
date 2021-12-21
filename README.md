@@ -1,8 +1,6 @@
-# bucketübrigade
+# bucket-brigade
 
-## What does this do?
-
-It takes files from an Amazon S3 (or compatible) bucket, transforms them with a specified command, and then puts them into an other S3 compatible bucket.
+You can use this tool to take files from an Amazon S3 (or compatible) bucket, transform them with a specified command, and then upload them into an other S3 compatible bucket.
 
 ## Dependencies
 

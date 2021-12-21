@@ -6,6 +6,7 @@ import { exec } from 'child_process';
 import AWS from 'aws-sdk';
 import rmrf from 'rmrf';
 import rc from 'rc';
+import mime from 'mime-types';
 
 const config = rc('bucket-brigade', {
 	awsEndpoint: '',
@@ -13,8 +14,9 @@ const config = rc('bucket-brigade', {
 	secretKey: '',
 	sourceBucket: '',
 	destinationBucket: '',
+	acl: 'public-read',
 	cacheDir: '.bucket-brigade-cache',
-	transformCommandTemplate: 'cp {source} {destination}',
+	transformCommandTemplate: 'cp {source} {dest}',
 });
 
 async function listObjectsPromise(
@@ -81,7 +83,7 @@ async function downloadOriginal(s3: AWS.S3, key: string): Promise<void> {
 	});
 }
 
-async function uploadTransformed(s3: AWS.S3, key: string, ContentType = 'image/jpg'): Promise<AWS.S3.PutObjectOutput> {
+async function uploadTransformed(s3: AWS.S3, key: string): Promise<AWS.S3.PutObjectOutput> {
 	const content = await fs.readFile(`${config.cacheDir}/transformed/` + key);
 
 	return new Promise((resolve, reject) => {
@@ -90,8 +92,8 @@ async function uploadTransformed(s3: AWS.S3, key: string, ContentType = 'image/j
 				Bucket: config.destinationBucket,
 				Key: key,
 				Body: content,
-				ACL: 'public-read',
-				ContentType,
+				ACL: config.acl,
+				ContentType: mime.lookup(key) || undefined,
 			},
 			(err, data) => {
 				if (err) {
