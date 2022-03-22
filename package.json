@@ -7,9 +7,9 @@
 		"bucket-brigade": "bin/index.js"
 	},
 	"scripts": {
-		"prepublish": "npm run build",
-		"postinstall": "npm run build",
-		"build": "tsc"
+		"prepublishOnly": "npm run build",
+		"build": "tsc",
+		"start": "ts-node ./src/index.ts"
 	},
 	"repository": {
 		"type": "git",

@@ -1,0 +1,5 @@
+magick
+.git
+node_modules
+bin
+.last-run
