@@ -191,7 +191,7 @@ async function writeLastRunTime(): Promise<void> {
 		process.stdout.write(' \x1b[32mdone\x1b[0m');
 		process.stdout.write(' uploading...');
 		await uploadTransformed(s3, key);
-		if (uploadOriginal) {
+		if (config.uploadOriginal) {
 			await uploadOriginal(s3, key);
 		}
 		process.stdout.write(' \x1b[32mdone\n\x1b[0m');
