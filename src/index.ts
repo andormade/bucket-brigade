@@ -17,6 +17,7 @@ const config = rc('bucket-brigade', {
 	acl: 'public-read',
 	cacheDir: '.bucket-brigade-cache',
 	transformCommandTemplate: 'cp {source} {dest}',
+	uploadOriginal: false
 });
 
 async function listObjectsPromise(
@@ -80,6 +81,30 @@ async function downloadOriginal(s3: AWS.S3, key: string): Promise<void> {
 			await fs.writeFile(`${config.cacheDir}/originals/${key}`, data.Body as string);
 			resolve();
 		});
+	});
+}
+
+async function uploadOriginal(s3: AWS.S3, key: string): Promise<AWS.S3.PutObjectOutput> {
+	const content = await fs.readFile(`${config.cacheDir}/originals/` + key);
+	const newKey = key.replace(/\.[^/.]+$/, "") + '_original' + path.extname(key);
+
+	return new Promise((resolve, reject) => {
+		s3.putObject(
+			{
+				Bucket: config.destinationBucket,
+				Key: newKey,
+				Body: content,
+				ACL: config.acl,
+				ContentType: mime.lookup(key) || undefined,
+			},
+			(err, data) => {
+				if (err) {
+					console.log(err);
+					return reject(err);
+				}
+				resolve(data);
+			}
+		);
 	});
 }
 
@@ -166,6 +191,9 @@ async function writeLastRunTime(): Promise<void> {
 		process.stdout.write(' \x1b[32mdone\x1b[0m');
 		process.stdout.write(' uploading...');
 		await uploadTransformed(s3, key);
+		if (uploadOriginal) {
+			await uploadOriginal(s3, key);
+		}
 		process.stdout.write(' \x1b[32mdone\n\x1b[0m');
 	});
 })();
